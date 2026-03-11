@@ -21,7 +21,7 @@ parameter S0 = 3'd0,
 always @(posedge clk or posedge rst)
 begin
     if (rst) begin
-        state <= S4;  //original: S0
+        state <= S0;
         dout <= 0;
     end
     else begin
@@ -29,7 +29,7 @@ begin
         if (state == S0) begin
             if (din == 1)
             begin
-                state <= S3;  //original S1
+                state <= S1;
                 dout <= 0;
                 end
             else
