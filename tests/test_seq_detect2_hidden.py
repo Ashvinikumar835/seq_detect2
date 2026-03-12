@@ -82,6 +82,51 @@ async def test_reset_clears_state(dut):
     await drive_and_check(dut, "110110", "000001")
 
 
+@cocotb.test()
+async def test_reset_mid_sequence(dut):
+    """Reset during sequence should clear detector state."""
+    clock = Clock(dut.clk, 10, units="ns")
+    cocotb.start_soon(clock.start())
+
+    await reset_dut(dut)
+
+    await drive_sequence(dut, "11011")
+
+    await reset_dut(dut)
+
+    await drive_and_check(dut, "0110110", 
+                               "0000001")
+
+
+@cocotb.test()
+async def test_continuous_stream(dut):
+    """Long continuous overlapping stream."""
+    clock = Clock(dut.clk, 10, units="ns")
+    cocotb.start_soon(clock.start())
+
+    await reset_dut(dut)
+
+    await drive_and_check(
+        dut,
+        "110110110110110110",
+        "000001001001001001"
+    )
+
+
+@cocotb.test()
+async def test_noise_with_pattern(dut):
+    """Pattern inside noisy stream."""
+    clock = Clock(dut.clk, 10, units="ns")
+    cocotb.start_soon(clock.start())
+
+    await reset_dut(dut)
+
+    await drive_and_check(
+        dut,
+        "10101101101100110110",
+        "00000000010010000001"
+    )
+
 
 def test_seq_detect2_hidden_runner():
     sim = os.getenv("SIM", "icarus")
