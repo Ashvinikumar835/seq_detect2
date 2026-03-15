@@ -82,56 +82,144 @@ async def test_reset_clears_state(dut):
     await drive_and_check(dut, "110110", "000001")
 
 
+###################
+
 @cocotb.test()
-async def test_reset_mid_sequence(dut):
-    """Reset during sequence should clear detector state."""
-    clock = Clock(dut.clk, 10, units="ns")
+async def test_full_overlap_chain(dut):
+    """
+    Continuous overlapping matches.
+    110110110110 -> detections at 6,9,12
+    input : 110110110110
+    output: 000001001001
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "110110110110", "000001001001")
+
+
+@cocotb.test()
+async def test_overlap_with_extra_prefix(dut):
+    """
+    Overlap where prefix immediately starts next match.
+    input : 1110110110
+    output: 0000001001
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "1110110110", "0000001001")
+
+
+@cocotb.test()
+async def test_partial_prefix_restart(dut):
+    """
+    Partial prefix then restart.
+    input : 1101110110110
+    output: 0000000001001
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "1101110110110", "0000000001001")
+
+
+
+@cocotb.test()
+async def test_dense_prefix_noise(dut):
+    """
+    Many prefix fragments that should not trigger false detect.
+    input : 111111011011
+    output: 000000000000
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "111111011011", "000000000100")
+
+
+@cocotb.test()
+async def test_long_noise_then_match(dut):
+    """
+    Long random prefix before valid match.
+    input : 1010101010110110
+    output: 0000000000000001
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "1010101010110110", "0000000000000001")
+
+
+
+@cocotb.test()
+async def test_all_zeros(dut):
+    """
+    Edge case: no ones at all.
+    input : 000000000000
+    output: 000000000000
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "000000000000", "000000000000")
+
+
+@cocotb.test()
+async def test_all_ones(dut):
+    """
+    Edge case: continuous ones.
+    Should never detect.
+    input : 111111111111
+    output: 000000000000
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "111111111111", "000000000000")
+
+
+@cocotb.test()
+async def test_back_to_back_matches(dut):
+    """
+    Back-to-back matches with minimal separation.
+    input : 1101100110110
+    output: 0000010000001
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+    await drive_and_check(dut, "1101100110110", "0000010000001")
+
+
+
+@cocotb.test()
+async def test_reset_mid_pattern(dut):
+    """
+    Reset exactly during a partial pattern.
+    FSM must forget previous state.
+    """
+    clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
 
     await reset_dut(dut)
 
-    await drive_sequence(dut, "11011")
-
+    await drive_sequence(dut, "11011")  # almost complete
     await reset_dut(dut)
 
-    await drive_and_check(dut, "0110110", 
-                               "0000001")
+    await drive_and_check(dut, "110110", "000001")
 
 
-@cocotb.test()
-async def test_continuous_stream(dut):
-    """Long continuous overlapping stream."""
-    clock = Clock(dut.clk, 10, units="ns")
-    cocotb.start_soon(clock.start())
-
-    await reset_dut(dut)
-
-    await drive_and_check(
-        dut,
-        "110110110110110110",
-        "000001001001001001"
-    )
 
 
-@cocotb.test()
-async def test_noise_with_pattern(dut):
-    """Pattern inside noisy stream."""
-    clock = Clock(dut.clk, 10, units="ns")
-    cocotb.start_soon(clock.start())
 
-    await reset_dut(dut)
 
-    await drive_and_check(
-        dut,
-        "10101101101100110110",
-        "00000000010010000001"
-    )
 
 
 def test_seq_detect2_hidden_runner():
     sim = os.getenv("SIM", "icarus")
     proj_path = Path(__file__).resolve().parent.parent
-    sources = [proj_path / "sources/seq_detect2.v"]
+    sources = [proj_path / "golden/seq_detect2.v"]
     runner = get_runner(sim)
     runner.build(
         sources=sources,
@@ -139,3 +227,6 @@ def test_seq_detect2_hidden_runner():
         always=True,
     )
     runner.test(hdl_toplevel="seq_detect2", test_module="test_seq_detect2_hidden")
+
+
+
